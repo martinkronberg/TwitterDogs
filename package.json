@@ -7,6 +7,8 @@
     "node": ">=0.10.0"
   },
   "dependencies": {
+      "jsupm_uln200xa":"latest",
+      "jsupm_i2clcd":"latest",
       "express":"latest",
       "socket.io":"latest",
       "http":"latest",
