@@ -15,10 +15,28 @@ var extra = {
 var geocoder = require('node-geocoder')(geocoderProvider, httpAdapter, extra);
 //Load twit module
 var Twit = require('twit');
-//Load stepper module
-var Uln200xa_lib = require('jsupm_uln200xa');
-//Load lcd module
-var lcd = require('jsupm_i2clcd');
+
+use_motor = true;
+try {
+  //Load stepper module
+  var Uln200xa_lib = require('jsupm_uln200xa');
+}
+catch (e) {
+  console.log(e)
+  console.log('Stepper module not loaded - motor won\'t be used.')
+  use_motor = false;
+}
+
+use_lcd = true;
+try {
+  //Load lcd module
+  var lcd = require('jsupm_i2clcd');
+}
+catch (e) {
+  console.log(e)
+  console.log('LCD module not loaded - screen won\'t be used.')
+  use_lcd = false;
+}
 //express module
 var express = require('express');
 //start express app
@@ -36,40 +54,43 @@ var T = new Twit({
     access_token_secret: '<TWITTER SECRET ACCESS TOKEN>'
 });
 
-// Instantiate a Stepper motor on a ULN200XA Darlington Motor Driver
-// This was tested with the Grove Geared Step Motor with Driver
-var myUln200xa_obj = new Uln200xa_lib.ULN200XA(4096, 8, 9, 10, 11);
+if (use_motor) {
+    // Instantiate a Stepper motor on a ULN200XA Darlington Motor Driver
+    // This was tested with the Grove Geared Step Motor with Driver
+    var myUln200xa_obj = new Uln200xa_lib.ULN200XA(4096, 8, 9, 10, 11);
 
-//stepper motor control functions
-myUln200xa_obj.forward = function(steps) {
-    ; // 5 RPMs
-    myUln200xa_obj.setDirection(Uln200xa_lib.ULN200XA.DIR_CW);
-    console.log("Rotating " + steps + " revolution clockwise.");
-    myUln200xa_obj.stepperSteps(steps);
-};
+    //stepper motor control functions
+    myUln200xa_obj.forward = function(steps) {
+        ; // 5 RPMs
+        myUln200xa_obj.setDirection(Uln200xa_lib.ULN200XA.DIR_CW);
+        console.log("Rotating " + steps + " revolution clockwise.");
+        myUln200xa_obj.stepperSteps(steps);
+    };
 
-myUln200xa_obj.reverse = function(steps) {
-    console.log("Rotating " + steps + " counter clockwise.");
-    myUln200xa_obj.setDirection(Uln200xa_lib.ULN200XA.DIR_CCW);
-    myUln200xa_obj.stepperSteps(steps);
-};
+    myUln200xa_obj.reverse = function(steps) {
+        console.log("Rotating " + steps + " counter clockwise.");
+        myUln200xa_obj.setDirection(Uln200xa_lib.ULN200XA.DIR_CCW);
+        myUln200xa_obj.stepperSteps(steps);
+    };
 
-myUln200xa_obj.stop = function() {
-    myUln200xa_obj.release();
-    console.log('stepper power off');
-};
+    myUln200xa_obj.stop = function() {
+        myUln200xa_obj.release();
+        console.log('stepper power off');
+    };
 
-myUln200xa_obj.quit = function() {
-    myUln200xa_obj = null;
-    Uln200xa_lib.cleanUp();
-    Uln200xa_lib = null;
-    console.log("Exiting");
-    process.exit(0);
-};
+    myUln200xa_obj.quit = function() {
+        myUln200xa_obj = null;
+        Uln200xa_lib.cleanUp();
+        Uln200xa_lib = null;
+        console.log("Exiting");
+        process.exit(0);
+    };
+}
 
-//Instantiate LCD JHD1313 module on the i2c bus
-var display = new lcd.Jhd1313m1(0, 0x3E, 0x62);
-
+if (use_lcd) {
+  //Instantiate LCD JHD1313 module on the i2c bus
+  var display = new lcd.Jhd1313m1(0, 0x3E, 0x62);
+}
 
 //begin twitter stream tracking the hashtags specified above 
 var stream = T.stream('statuses/filter', {
@@ -132,24 +153,26 @@ stream.on('tweet', function(tweet) {
         console.log(tweet['text'])
         console.log('dog 1 tweets: ' + dog1_tweets);
 
-        //LCD controls 
-        display.setColor(0, 155, 155);
-        display.setCursor(0, 0);
-        display.write(dog1_tweets + ' for ' + dog1);
-        display.setCursor(1, 0);
-        display.write(dog2_tweets + ' for ' + dog2);
+        if (use_lcd) {
+            //LCD controls 
+            display.setColor(0, 155, 155);
+            display.setCursor(0, 0);
+            display.write(dog1_tweets + ' for ' + dog1);
+            display.setCursor(1, 0);
+            display.write(dog2_tweets + ' for ' + dog2);
+        }
 
-        //Servo controls 
-        if (dog_side == 2) {
-
-            myUln200xa_obj.reverse((dog1_tweets + dog2_tweets) * 50);
-            myUln200xa_obj.stop();
-            dog_side = 1;
-        } else if (dog_side == 1) {
-
-            myUln200xa_obj.reverse(50);
-            myUln200xa_obj.stop();
-            dog_side = 1;
+        if (use_motor) {
+            //Servo controls 
+            if (dog_side == 2) {
+                myUln200xa_obj.reverse((dog1_tweets + dog2_tweets) * 50);
+                myUln200xa_obj.stop();
+                dog_side = 1;
+            } else if (dog_side == 1) {
+                myUln200xa_obj.reverse(50);
+                myUln200xa_obj.stop();
+                dog_side = 1;
+            }
         }
     }
 
@@ -159,40 +182,50 @@ stream.on('tweet', function(tweet) {
         console.log(tweet['text'])
         console.log(dog2 + ' tweets: ' + dog2_tweets);
 
-        //LCD controls
-        display.setColor(0, 155, 155);
-        display.setCursor(0, 0);
-        display.write(dog1_tweets + ' for ' + dog1);
-        display.setCursor(1, 0);
-        display.write(dog2_tweets + ' for ' + dog2);
+        if (use_lcd) {
+            //LCD controls
+            display.setColor(0, 155, 155);
+            display.setCursor(0, 0);
+            display.write(dog1_tweets + ' for ' + dog1);
+            display.setCursor(1, 0);
+            display.write(dog2_tweets + ' for ' + dog2);
+        }
 
-        //servo controls 
-        if (dog_side == 1) {
-            dog_side = 2;
-            myUln200xa_obj.forward((dog2_tweets + dog1_tweets) * 50);
-            myUln200xa_obj.stop();
-        } else if (dog_side == 2) {
-            myUln200xa_obj.forward(50);
-            myUln200xa_obj.stop();
-            dog_side = 2;
+        if (use_motor) {
+            //servo controls 
+            if (dog_side == 1) {
+                dog_side = 2;
+                myUln200xa_obj.forward((dog2_tweets + dog1_tweets) * 50);
+                myUln200xa_obj.stop();
+            } else if (dog_side == 2) {
+                myUln200xa_obj.forward(50);
+                myUln200xa_obj.stop();
+                dog_side = 2;
+            }
         }
 
     };
     //victory condition met (first dog to 10 votes)
     if (dog1_tweets >= 10) {
-        display.setColor(0, 255, 0);
-        display.setCursor(0, 0);
-        display.write(dog1 + "        ");
-        display.setCursor(1, 0);
-        display.write("Is cutest dog!");
+        console.log(dog1 + " is cutest dog!");
+        if (use_lcd) {
+            display.setColor(0, 255, 0);
+            display.setCursor(0, 0);
+            display.write(dog1 + "        ");
+            display.setCursor(1, 0);
+            display.write("Is cutest dog!");
+        }
     }
 
     if (dog2_tweets >= 10) {
-        display.setColor(0, 255, 0);
-        display.setCursor(0, 0);
-        display.write(dog2 + "        ");
-        display.setCursor(1, 0);
-        display.write("Is cutest dog!");
+        console.log(dog2 + " is cutest dog!");
+        if (use_lcd) {
+            display.setColor(0, 255, 0);
+            display.setCursor(0, 0);
+            display.write(dog2 + "        ");
+            display.setCursor(1, 0);
+            display.write("Is cutest dog!");
+        }
     }
 });
 
